@@ -173,3 +173,74 @@ class MediaServerPlayItem(BaseModel):
     image: Optional[str] = None
     link: Optional[str] = None
     percent: Optional[float] = None
+
+class MediaServerItemFilter(MediaServerItem):
+    """
+    筛选字段
+    """
+    parent_id: Optional[str] = None
+    item_id: Optional[str] = None
+    title: Optional[str] = None
+    year: Optional[str] = None
+    item_type: Optional[list[str]] = None
+    tmdbid: Optional[int] = None
+    imdbid: Optional[str] = None
+    tvdbid: Optional[str] = None
+    played: Optional[bool] = None
+    resume: Optional[bool] = None
+    # 更多筛选项
+
+    """
+    排序类
+    """
+    sort_name: Optional[str] = None
+    sort_order: Optional[bool] = None
+
+    """
+    分页
+    """
+    # 起始页
+    start_index: Optional[int] = None
+    # 页面大小 不建议超过100
+    limit: Optional[int] = None
+
+    _emby_params: Dict[str, str] = None
+    _jellyfin_params: Dict[str, str] = None
+    _plex_params: Dict[str, str] = None
+
+
+    def set_extra_params(self, extra: Dict[str, Dict[str, str]]):
+        """
+        设置自定义参数
+
+        :param extra: 额外参数，需要指定媒体服务类型，例如:
+            set_extra_params({
+                'emby': {'Fields': 'CommunityRating'},
+                'jellyfin': {'Fields': 'CommunityRating'}
+            })
+        """
+        for server, params in extra:
+            if server == "emby":
+                self._emby_params = {**self._emby_params, **params}
+            elif server == "jellyfin":
+                self._jellyfin_params = {**self._jellyfin_params, **params}
+            elif server == "plex":
+                self._plex_params = {**self._plex_params, **params}
+
+    def get_emby_params(self) -> Dict[str, str]:
+        """
+        获取Emby搜索参数
+        """
+        return self._emby_params
+
+    def get_jellyfin_params(self) -> Dict[str, str]:
+        """
+        获取Jellyfin搜索参数
+        """
+        return self._jellyfin_params
+
+    def get_plex_params(self) -> Dict[str, str]:
+        """
+        获取Plex搜索参数
+        """
+        return self._plex_params
