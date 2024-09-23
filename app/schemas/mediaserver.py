@@ -2,6 +2,10 @@ from pathlib import Path
 from typing import Optional, Dict, Union, List, Any
 
 from pydantic import BaseModel
+<<<<<<< HEAD
+=======
+
+>>>>>>> 8d5a348d (wip: 20240923)
 from app.schemas.types import MediaType, MediaServerType
 
 
@@ -178,69 +182,117 @@ class MediaServerItemFilter(MediaServerItem):
     """
     筛选字段
     """
+    # 父媒体库ID
     parent_id: Optional[str] = None
-    item_id: Optional[str] = None
+    # 媒体标题
     title: Optional[str] = None
+    # 出版年份
     year: Optional[str] = None
-    item_type: Optional[list[str]] = None
-    tmdbid: Optional[int] = None
-    imdbid: Optional[str] = None
-    tvdbid: Optional[str] = None
-    played: Optional[bool] = None
+    # 是否已播放
+    is_played: Optional[bool] = None
+    # 是否可以继续播放
     resume: Optional[bool] = None
-    # 更多筛选项
 
     """
-    排序类
+    排序字段
     """
-    sort_name: Optional[str] = None
-    sort_order: Optional[bool] = None
+    # todo 需要兼容Emby/Jellyfin/Plex
 
     """
-    分页
+    分页 默认 每页100
     """
     # 起始页
-    start_index: Optional[int] = None
+    start_index: Optional[int] = 0
     # 页面大小 不建议超过100
-    limit: Optional[int] = None
+    limit: Optional[int] = 100
 
     _emby_params: Dict[str, str] = None
     _jellyfin_params: Dict[str, str] = None
     _plex_params: Dict[str, str] = None
 
 
-    def set_extra_params(self, extra: Dict[str, Dict[str, str]]):
+    def set_page(self, start_index: int = 0, limit: int = 100):
+        """
+        设置分页，每次请求都需要手动设置分页起始和大小
+        :param start_index: 起始页
+        :param limit: 页面大小
+        """
+        self.start_index = start_index
+        self.limit = limit
+        return self
+
+
+    def set_extra_params(self, extra: Dict[MediaServerType, Dict[str, str]]):
         """
         设置自定义参数
-
         :param extra: 额外参数，需要指定媒体服务类型，例如:
             set_extra_params({
-                'emby': {'Fields': 'CommunityRating'},
-                'jellyfin': {'Fields': 'CommunityRating'}
+                MediaServerType.EMBY: {'Fields': 'CommunityRating'},
+                MediaServerType.JELLYFIN: {'Fields': 'CommunityRating'}
             })
         """
         for server, params in extra:
-            if server == "emby":
+            if server == MediaServerType.EMBY:
                 self._emby_params = {**self._emby_params, **params}
-            elif server == "jellyfin":
+            elif server == MediaServerType.JELLYFIN:
                 self._jellyfin_params = {**self._jellyfin_params, **params}
-            elif server == "plex":
+            elif server == MediaServerType.PLEX:
                 self._plex_params = {**self._plex_params, **params}
+        return self
+
+    def _build_params(self):
+        """
+        构建不同客户端的筛选参数
+        """
+        # Emby/Jellyfin参数构建
+        self._emby_params = {
+            "ParentId": self.parent_id,
+            "Fields": "ProviderIds,OriginalTitle,ProductionYear,Path,UserDataPlayCount,UserDataLastPlayedDate,ParentId",
+            "IsPlayed": self.is_played,
+            "Recursive": self.resume,
+
+            "Limit": self.limit,
+            "StartIndex": self.start_index,
+        }
+
+        # Jellyfin参数构建（兼容Emby参数）
+        self._jellyfin_params = {
+            **self._emby_params,
+        }
+
+        # Plex参数构建
+        self._plex_params = {
+            "librarySectionID": int(self.parent_id),
+            "title": self.title,
+            "year": int(self.year),
+            "unwatched": None if self.is_played is None else not self.is_played,
+            "inProgress": None if self.resume is None else self.resume,
+        }
+        return self
+
+    def _get_params(self, server: MediaServerType) -> Dict[str, str]:
+        """
+        获取指定媒体服务器参数
+        """
+        self._build_params()
+        params = self._emby_params if server == MediaServerType.EMBY else \
+            (self._jellyfin_params if server == MediaServerType.JELLYFIN else self._plex_params)
+        return {k: v for k, v in params.items() if v is not None}
 
     def get_emby_params(self) -> Dict[str, str]:
         """
         获取Emby搜索参数
         """
-        return self._emby_params
+        return self._get_params(MediaServerType.EMBY)
 
     def get_jellyfin_params(self) -> Dict[str, str]:
         """
         获取Jellyfin搜索参数
         """
-        return self._jellyfin_params
+        return self._get_params(MediaServerType.JELLYFIN)
 
     def get_plex_params(self) -> Dict[str, str]:
         """
         获取Plex搜索参数
         """
-        return self._plex_params
+        return self._get_params(MediaServerType.PLEX)

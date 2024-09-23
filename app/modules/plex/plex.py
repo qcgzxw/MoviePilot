@@ -9,7 +9,6 @@ from plexapi.server import PlexServer
 from requests import Response, Session
 
 from app import schemas
-from app.core.config import settings
 from app.log import logger
 from app.schemas import MediaType, MediaServerType
 from app.utils.http import RequestUtils

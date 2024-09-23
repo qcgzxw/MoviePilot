@@ -10,7 +10,8 @@ from requests import Response
 from app import schemas
 from app.core.config import settings
 from app.log import logger
-from app.schemas.types import MediaType, MediaServerType
+from app.schemas import MediaServerType
+from app.schemas.types import MediaType
 from app.utils.http import RequestUtils
 from app.utils.url import UrlUtils
 
