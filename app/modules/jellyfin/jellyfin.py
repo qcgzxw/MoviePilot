@@ -7,12 +7,13 @@ from requests import Response
 from app import schemas
 from app.core.config import settings
 from app.log import logger
-from app.schemas import MediaType, MediaServerType
+from app.schemas import MediaType, MediaServerType, MediaServerItemFilter
 from app.utils.http import RequestUtils
 from app.utils.url import UrlUtils
 
 
 class Jellyfin:
+    _server_name: str = None
     _host: str = None
     _apikey: str = None
     _playhost: str = None
@@ -726,25 +727,19 @@ class Jellyfin:
             logger.error(f"连接Users/{self.user}/Items/{itemid}：" + str(e))
         return None
 
-    def get_items(self, parent: str, start_index: int = 0, limit: int = 100) -> Generator:
+    def get_items(self, condition: MediaServerItemFilter) -> Generator:
         """
         获取媒体服务器所有媒体库列表
-        :param parent: 父媒体库ID
-        :param start_index: 开始索引，用于分页
-        :param limit: 每次请求返回的项目数量
-        :return: 生成器 schemas.MediaServerItem
+        :param condition: 过滤条件
         """
-        if not parent:
+        if condition is None:
             yield None
         if not self._host or not self._apikey:
             yield None
         url = f"{self._host}Users/{self.user}/Items"
         params = {
-            "parentId": parent,
+            **condition.get_jellyfin_params(),
             "api_key": self._apikey,
-            "Fields": "ProviderIds,OriginalTitle,ProductionYear,Path,UserDataPlayCount,UserDataLastPlayedDate,ParentId",
-            "StartIndex": start_index,
-            "Limit": limit,
         }
         try:
             res = RequestUtils().get_res(url, params)
@@ -755,7 +750,7 @@ class Jellyfin:
                 if not item:
                     continue
                 if "Folder" in item.get("Type"):
-                    for items in self.get_items(item.get("Id")):
+                    for items in self.get_items(MediaServerItemFilter(parent_id=item.get("Id"))):
                         yield items
                 elif item.get("Type") in ["Movie", "Series"]:
                     yield self.__format_item_info(item)

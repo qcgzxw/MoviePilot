@@ -6,9 +6,8 @@ from app.helper.mediaserver import MediaServerHelper
 from app.log import logger
 from app.modules import _ModuleBase, _MediaServerBase
 from app.modules.plex.plex import Plex
-from app.schemas import MediaServerConf
+from app.schemas import MediaServerConf, MediaServerItemFilter
 from app.schemas.types import MediaType, MediaServerType
-
 
 class PlexModule(_ModuleBase, _MediaServerBase):
 
@@ -168,13 +167,13 @@ class PlexModule(_ModuleBase, _MediaServerBase):
             return server.get_librarys(hidden)
         return None
 
-    def mediaserver_items(self, server: str, library_id: str, start_index: int = 0, limit: int = 100) -> Optional[Generator]:
+    def mediaserver_items(self, server: str, username: str, item_filter) -> Optional[Generator]:
         """
         媒体库项目列表
         """
         server: Plex = self.get_server(server)
         if server:
-            return server.get_items(library_id, start_index, limit)
+            return server.get_items(item_filter)
         return None
 
     def mediaserver_iteminfo(self, server: str, item_id: str) -> Optional[schemas.MediaServerItem]:

@@ -13,7 +13,7 @@ from app.core.security import verify_token
 from app.db import get_db
 from app.db.mediaserver_oper import MediaServerOper
 from app.db.models import MediaServerItem
-from app.schemas import MediaType, NotExistMediaInfo
+from app.schemas import MediaType, NotExistMediaInfo, MediaServerItemFilter
 
 router = APIRouter()
 
@@ -143,3 +143,28 @@ def library(server: str, hidden: bool = False,
     获取媒体服务器媒体库列表
     """
     return MediaServerChain().librarys(server=server, username=userinfo.username, hidden=hidden) or []
+
+@router.get("/items", summary="剧集列表", response_model=List[schemas.MediaServerItem])
+def items(
+        server: str,
+        parent_id: str,
+        title: str = None,
+        year: str = None,
+        is_played: bool = None,
+        resume: bool = None,
+        start_index: int = 0,
+        limit: int = 50,
+        userinfo: schemas.TokenPayload = Depends(verify_token)) -> Any:
+    """
+    获取媒体库条目
+    """
+    item_filter = MediaServerItemFilter(
+        parent_id=parent_id,
+        title=title,
+        year=year,
+        is_played=is_played,
+        resume=resume,
+        start_index=start_index,
+        limit=limit
+    )
+    return MediaServerChain().items(server=server, username=userinfo.username, item_filter=item_filter) or []

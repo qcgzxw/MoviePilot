@@ -2,10 +2,6 @@ from pathlib import Path
 from typing import Optional, Dict, Union, List, Any
 
 from pydantic import BaseModel
-<<<<<<< HEAD
-=======
-
->>>>>>> 8d5a348d (wip: 20240923)
 from app.schemas.types import MediaType, MediaServerType
 
 
@@ -178,7 +174,7 @@ class MediaServerPlayItem(BaseModel):
     link: Optional[str] = None
     percent: Optional[float] = None
 
-class MediaServerItemFilter(MediaServerItem):
+class MediaServerItemFilter(BaseModel):
     """
     筛选字段
     """
@@ -194,11 +190,6 @@ class MediaServerItemFilter(MediaServerItem):
     resume: Optional[bool] = None
 
     """
-    排序字段
-    """
-    # todo 需要兼容Emby/Jellyfin/Plex
-
-    """
     分页 默认 每页100
     """
     # 起始页
@@ -206,9 +197,35 @@ class MediaServerItemFilter(MediaServerItem):
     # 页面大小 不建议超过100
     limit: Optional[int] = 100
 
-    _emby_params: Dict[str, str] = None
-    _jellyfin_params: Dict[str, str] = None
-    _plex_params: Dict[str, str] = None
+    emby_params: Dict[str, str] = {}
+    jellyfin_params: Dict[str, str] = {}
+    plex_params: Dict[str, str] = {}
+
+
+    def __init__(self, parent_id: Optional[str] = None, title: Optional[str] = None, year: Optional[str] = None,
+                 is_played: Optional[bool] = None, resume: Optional[bool] = None, start_index: Optional[int] = 0,
+                 limit: Optional[int] = 100, **data: Any):
+        """
+        构造函数用于初始化筛选器对象，并允许通过关键字参数设置筛选字段。
+
+        :param parent_id: 可选，父媒体库ID
+        :param title: 可选，媒体标题
+        :param year: 可选，出版年份
+        :param is_played: 可选，是否已播放
+        :param resume: 可选，是否可以继续播放
+        :param data: 其他父类传递的参数（通过 **data 传递）
+        """
+        # 调用父类的构造函数
+        super().__init__(**data)
+
+        # 初始化筛选字段
+        self.parent_id = parent_id
+        self.title = title
+        self.year = year
+        self.is_played = is_played
+        self.resume = resume
+        self.start_index = start_index
+        self.limit = limit
 
 
     def set_page(self, start_index: int = 0, limit: int = 100):
@@ -232,12 +249,12 @@ class MediaServerItemFilter(MediaServerItem):
             })
         """
         for server, params in extra:
-            if server == MediaServerType.EMBY:
-                self._emby_params = {**self._emby_params, **params}
-            elif server == MediaServerType.JELLYFIN:
-                self._jellyfin_params = {**self._jellyfin_params, **params}
-            elif server == MediaServerType.PLEX:
-                self._plex_params = {**self._plex_params, **params}
+            if server == MediaServerType.Emby:
+                self.emby_params = {**self.emby_params, **params}
+            elif server == MediaServerType.Jellyfin:
+                self.jellyfin_params = {**self.jellyfin_params, **params}
+            elif server == MediaServerType.Plex:
+                self.plex_params = {**self.plex_params, **params}
         return self
 
     def _build_params(self):
@@ -245,26 +262,25 @@ class MediaServerItemFilter(MediaServerItem):
         构建不同客户端的筛选参数
         """
         # Emby/Jellyfin参数构建
-        self._emby_params = {
+        self.emby_params = {
             "ParentId": self.parent_id,
             "Fields": "ProviderIds,OriginalTitle,ProductionYear,Path,UserDataPlayCount,UserDataLastPlayedDate,ParentId",
             "IsPlayed": self.is_played,
             "Recursive": self.resume,
-
             "Limit": self.limit,
             "StartIndex": self.start_index,
         }
 
         # Jellyfin参数构建（兼容Emby参数）
-        self._jellyfin_params = {
-            **self._emby_params,
+        self.jellyfin_params = {
+            **self.emby_params,
         }
 
         # Plex参数构建
-        self._plex_params = {
+        self.plex_params = {
             "librarySectionID": int(self.parent_id),
-            "title": self.title,
-            "year": int(self.year),
+            "title": None if self.title is None else self.title,
+            "year": None if self.year is None else int(self.year),
             "unwatched": None if self.is_played is None else not self.is_played,
             "inProgress": None if self.resume is None else self.resume,
         }
@@ -275,23 +291,23 @@ class MediaServerItemFilter(MediaServerItem):
         获取指定媒体服务器参数
         """
         self._build_params()
-        params = self._emby_params if server == MediaServerType.EMBY else \
-            (self._jellyfin_params if server == MediaServerType.JELLYFIN else self._plex_params)
+        params = self.emby_params if server == MediaServerType.EMBY else \
+            (self.jellyfin_params if server == MediaServerType.JELLYFIN else self.plex_params)
         return {k: v for k, v in params.items() if v is not None}
 
-    def get_emby_params(self) -> Dict[str, str]:
+    def get_emby_params(self) -> (Dict[str, str]):
         """
         获取Emby搜索参数
         """
         return self._get_params(MediaServerType.EMBY)
 
-    def get_jellyfin_params(self) -> Dict[str, str]:
+    def get_jellyfin_params(self) -> (Dict[str, str]):
         """
         获取Jellyfin搜索参数
         """
         return self._get_params(MediaServerType.JELLYFIN)
 
-    def get_plex_params(self) -> Dict[str, str]:
+    def get_plex_params(self) -> (Dict[str, str]):
         """
         获取Plex搜索参数
         """

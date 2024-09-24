@@ -10,12 +10,13 @@ from requests import Response, Session
 
 from app import schemas
 from app.log import logger
-from app.schemas import MediaType, MediaServerType
+from app.schemas import MediaType, MediaServerType, MediaServerItemFilter
 from app.utils.http import RequestUtils
 from app.utils.url import UrlUtils
 
 
 class Plex:
+    _server_name = None
     _plex = None
     _session = None
     _sync_libraries: List[str] = []
@@ -449,22 +450,22 @@ class Plex:
 
         return ids
 
-    def get_items(self, parent: str, start_index: int = 0, limit: int = 100) -> Generator:
+    def get_items(self, condition: MediaServerItemFilter) -> Generator:
         """
         获取媒体服务器所有媒体库列表
-        :param parent: 父媒体库ID
-        :param start_index: 开始索引，用于分页
-        :param limit: 每次请求返回的项目数量
-        :return: 生成器 schemas.MediaServerItem
+        :param condition: 过滤条件
         """
-        if not parent:
+        if condition is None:
             yield None
-        if not self._plex:
+        params = condition.get_plex_params()
+        section_id = params.get("librarySectionID") or 0
+        if section_id == 0 or self._plex is None:
             yield None
+        params.pop("librarySectionID", None)
         try:
-            section = self._plex.library.sectionByID(int(parent))
+            section = self._plex.library.sectionByID(section_id)
             if section:
-                for item in section.all(container_start=start_index, limit=limit):
+                for item in section.all(**params):
                     try:
                         if not item:
                             continue
